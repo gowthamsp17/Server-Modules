@@ -1,0 +1,48 @@
+#!/bin/bash
+
+CSV="ct1-ips.csv"
+USER="patcher"
+PASSWORD="T#YOt#gRHHPI90@%_402"
+
+OUTPUT="all_modules.txt"
+
+# Clear old output
+> "$OUTPUT"
+
+while IFS=',' read -r IP TYPE OS
+do
+    # Remove leading/trailing whitespace
+    IP=$(echo "$IP" | xargs)
+    OS=$(echo "$OS" | xargs)
+
+    # Skip empty lines
+    [[ -z "$IP" ]] && continue
+
+    # Process only Debian systems
+    if [[ "$OS" != Debian* ]]; then
+        continue
+    fi
+
+    echo "Checking $IP ($OS)..."
+
+    sshpass -p "$PASSWORD" ssh \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=5 \
+        -o ConnectionAttempts=1 \
+        "$USER@$IP" \
+        "lsmod 2>/dev/null | awk 'NR > 1 {print \$1}'" \
+        2>/dev/null >> "$OUTPUT"
+
+done < "$CSV"
+
+# Create unique union list
+sort -u "$OUTPUT" -o "$OUTPUT"
+
+echo
+echo "======================================"
+echo "Unique modules from all Debian servers"
+echo "======================================"
+cat "$OUTPUT"
+echo
+echo "Total unique modules: $(wc -l < "$OUTPUT")"
+echo "Output saved to: $OUTPUT"

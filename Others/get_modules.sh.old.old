@@ -1,0 +1,73 @@
+#!/bin/bash
+
+CSV="ct1-test.csv"
+USER="patcher"
+
+PASSWORD1="0Jejve7YVN7R"
+PASSWORD2="T#YOt#gRHHPI90@%_402"
+
+OUTPUT="all_modules.txt"
+
+> "$OUTPUT"
+
+while IFS=',' read -r IP TYPE OS
+do
+    IP=$(echo "$IP" | xargs)
+    OS=$(echo "$OS" | xargs)
+
+    [[ -z "$IP" ]] && continue
+
+    # Process only Debian servers
+    [[ "$OS" != Debian* ]] && continue
+
+    echo "Checking $IP ($OS)..."
+
+    # Try first password
+    MODULES=$(sshpass -p "$PASSWORD1" ssh \
+        -o StrictHostKeyChecking=no \
+        -o ConnectTimeout=10 \
+        -o ConnectionAttempts=1 \
+        "$USER@$IP" \
+        'lsmod | awk "NR > 1 {print \$1}"' 2>/dev/null)
+
+    # If first password fails, try second password
+    if [[ $? -ne 0 ]]; then
+        echo "  First password failed. Trying second password..."
+
+        MODULES=$(sshpass -p "$PASSWORD2" ssh \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            -o ConnectionAttempts=1 \
+            "$USER@$IP" \
+            'lsmod | awk "NR > 1 {print \$1}"' 2>/dev/null)
+    fi
+
+    # Check whether login/command succeeded
+    if [[ $? -ne 0 ]]; then
+        echo "  SSH LOGIN FAILED: $IP"
+        continue
+    fi
+
+    if [[ -z "$MODULES" ]]; then
+        echo "  No modules returned"
+        continue
+    fi
+
+    echo "  Success"
+    echo "$MODULES" >> "$OUTPUT"
+
+done < "$CSV"
+
+# Create unique union
+sort -u "$OUTPUT" -o "$OUTPUT"
+
+echo
+echo "========================================"
+echo "Unique modules from all Debian servers"
+echo "========================================"
+
+cat "$OUTPUT"
+
+echo
+echo "Total unique modules: $(wc -l < "$OUTPUT")"
+echo "Output saved to: $OUTPUT"
