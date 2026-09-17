@@ -1,1 +1,2 @@
 Scripts/CT1/CT1_Modules.csv filter=lfs diff=lfs merge=lfs -text
+Scripts/CT1/others/CT1_Modules.csv filter=lfs diff=lfs merge=lfs -text
