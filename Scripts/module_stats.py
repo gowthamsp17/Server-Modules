@@ -59,15 +59,8 @@ TYPE_CH = "Container Host"
 TYPE_KVM = "KVM Host"
 TYPE_CN = "Container"
 TYPE_UNKNOWN = "Unknown"
-# IPs present in the module matrix but in none of the three inventory sheets.
-TYPE_ABSENT = "Not in inventory"
 
-SERVER_TYPE_ORDER = [TYPE_VM, TYPE_PS, TYPE_CH, TYPE_KVM, TYPE_CN,
-                     TYPE_UNKNOWN, TYPE_ABSENT]
-
-# Buckets that are diagnostics rather than real server types; only printed
-# when non-zero.
-DIAGNOSTIC_TYPES = {TYPE_UNKNOWN, TYPE_ABSENT}
+SERVER_TYPE_ORDER = [TYPE_VM, TYPE_PS, TYPE_CH, TYPE_KVM, TYPE_CN, TYPE_UNKNOWN]
 
 # Raw "Server Type" values in CT1_PS_KVM_CH.csv -> report label.
 PS_TYPE_MAP = {
@@ -348,17 +341,12 @@ def build_records(loaded_ips, servers, inventory, kernel_versions, strict_kernel
 
         server_type = inv.get("type")
         if not server_type or server_type == TYPE_UNKNOWN:
-            # Fall back to the fleet-wide sheet when the inventory row is blank
-            # or the IP is missing from the inventories altogether.
+            # Fall back to the fleet-wide sheet when the inventory row is blank.
             fallback = server.get("server_type", "").upper()
-            resolved = PS_TYPE_MAP.get(
-                fallback, {"VM": TYPE_VM, "CN": TYPE_CN}.get(fallback))
-            if resolved:
-                server_type = resolved
-            elif ip in inventory:
-                server_type = TYPE_UNKNOWN
-            else:
-                server_type = TYPE_ABSENT
+            server_type = PS_TYPE_MAP.get(
+                fallback,
+                {"VM": TYPE_VM, "CN": TYPE_CN}.get(fallback, TYPE_UNKNOWN),
+            )
 
         records.append({
             "ip": ip,
@@ -537,7 +525,7 @@ def print_report(module, scan, records, summary, kernel_versions, top, strict_ke
     print_heading("4. Server type (of %d loaded IPs)" % loaded)
     for label in SERVER_TYPE_ORDER:
         count = summary["server_type"].get(label, 0)
-        if count or label not in DIAGNOSTIC_TYPES:
+        if count or label != TYPE_UNKNOWN:
             print("  %-16s  %7d  %8s" % (label, count, percent(count, loaded)))
     print("  %-16s  %7d" % ("total", sum(summary["server_type"].values())))
 
@@ -621,7 +609,7 @@ def export_summary(path, module, scan, records, summary, kernel_versions):
 
         for label in SERVER_TYPE_ORDER:
             count = summary["server_type"].get(label, 0)
-            if count or label not in DIAGNOSTIC_TYPES:
+            if count or label != TYPE_UNKNOWN:
                 yield ("Server Type", label, count, percent(count, loaded))
 
     with open(path, "w", newline="", encoding="utf-8") as handle:
